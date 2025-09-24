@@ -1,0 +1,30 @@
+name: Citation Scraper
+
+on:
+  schedule:
+    # Runs every 5 minutes
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.7" # Or your preferred Python version
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Scraper
+        # We pass the Supabase secrets to the script as environment variables
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python run_scraper.py
