@@ -56,46 +56,12 @@ def run_scrape():
         return
     supabase: Client = create_client(url, key)
 
-    # 1. Define the citation prefixes and their fallback starting IDs
     citation_series = {
-        "73": 7325173198,   # Original series
-        "11": 1125009340,   # New series
-        "4":  425039555     # New series (leading zero is ignored)
+        "73": 7325173198,
+        "11": 1125009340,
+        "4": 425039555
     }
-
-    ids_to_check = []
-    print("Preparing to check citation series...")
-
-    # 2. For each series, find the last known ID and generate the next 5
-    for prefix, fallback_id in citation_series.items():
-        try:
-            # Query for the latest citation_number that starts with the prefix
-            response = supabase.table('citations').select('citation_number') \
-                .like('citation_number', f'{prefix}%') \
-                .order('citation_number', desc=True).limit(1).execute()
-            
-            if response.data:
-                last_known_id = int(response.data[0]['citation_number'])
-                print(f"  - Series '{prefix}': Last known ID is {last_known_id}.")
-            else:
-                last_known_id = fallback_id
-                print(f"  - Series '{prefix}': No previous data. Starting with fallback ID {last_known_id}.")
-            
-            # Add the next 5 IDs for this series to our main list
-            ids_to_check.extend([str(last_known_id + i) for i in range(1, 6)])
-
-        except Exception as e:
-            print(f"Error fetching last known ID for prefix '{prefix}': {e}")
-            # If DB query fails for one prefix, we can still continue with others
-            continue
     
-    if not ids_to_check:
-        print("Could not generate any IDs to check. Exiting.")
-        return
-        
-    print(f"\nTotal IDs to check: {len(ids_to_check)}")
-    
-    # 3. Scrape for new citations
     found_citations = []
     
     # --- Setup WebDriver ---
@@ -106,23 +72,66 @@ def run_scrape():
     driver = webdriver.Chrome(options=options)
 
     try:
-        for cid in ids_to_check:
-            result = scrape_citation_data(driver, cid)
-            if result:
-                found_citations.append(result)
+        # 1. For each series, find the last known ID and start scraping
+        for prefix, fallback_id in citation_series.items():
+            print(f"\n--- Starting check for series with prefix '{prefix}' ---")
+            last_known_id = 0
+            try:
+                response = supabase.table('citations').select('citation_number') \
+                    .like('citation_number', f'{prefix}%') \
+                    .order('citation_number', desc=True).limit(1).execute()
+                
+                if response.data:
+                    last_known_id = int(response.data[0]['citation_number'])
+                else:
+                    last_known_id = fallback_id
+                
+                print(f"Starting after last known ID: {last_known_id}")
+
+            except Exception as e:
+                print(f"Error fetching last known ID for prefix '{prefix}': {e}")
+                continue
+
+            # 2. Continuously scrape in batches of 5
+            while True:
+                batch_ids_to_check = [str(last_known_id + i) for i in range(1, 6)]
+                batch_results = []
+                
+                for cid in batch_ids_to_check:
+                    result = scrape_citation_data(driver, cid)
+                    if result:
+                        batch_results.append(result)
+                
+                if batch_results:
+                    found_citations.extend(batch_results)
+
+                # NEW STOP CONDITION: Only stop if the last ID in the batch was not found.
+                last_id_in_batch = batch_ids_to_check[-1]
+                found_numbers_in_batch = {item['citation_number'] for item in batch_results}
+
+                if last_id_in_batch not in found_numbers_in_batch:
+                    print(f"Last ID in batch ({last_id_in_batch}) was not found. Stopping series '{prefix}'.")
+                    break
+                
+                # If the last ID was found, continue to the next batch
+                print(f"Last ID in batch ({last_id_in_batch}) was found. Continuing to next batch...")
+                last_known_id = int(last_id_in_batch)
+
     finally:
         driver.quit()
 
-    # 4. Insert new citations into the database
+    # 3. Insert new citations into the database
     if found_citations:
-        print(f"\nFound {len(found_citations)} new citations. Inserting into database...")
+        unique_citations = list({item['citation_number']: item for item in found_citations}.values())
+        
+        print(f"\nFound a total of {len(unique_citations)} unique new citations. Inserting into database...")
         try:
-            supabase.table('citations').upsert(found_citations).execute()
+            supabase.table('citations').upsert(unique_citations).execute()
             print("Successfully inserted new citations.")
         except Exception as e:
             print(f"Error inserting data into Supabase: {e}")
     else:
-        print("\nNo new citations found in the checked range.")
+        print("\nNo new citations found across all series.")
 
 if __name__ == "__main__":
     run_scrape()
