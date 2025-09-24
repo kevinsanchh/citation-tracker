@@ -59,7 +59,7 @@ def run_scrape():
     citation_series = {
         "73": 7325173198,
         "11": 1125009340,
-        "4": 425039555
+        "04": 425039555  # Now using '04' as the prefix key
     }
     
     found_citations = []
@@ -77,11 +77,13 @@ def run_scrape():
             print(f"\n--- Starting check for series with prefix '{prefix}' ---")
             last_known_id = 0
             try:
+                # This query now uses the prefix directly (e.g., '04%')
                 response = supabase.table('citations').select('citation_number') \
                     .like('citation_number', f'{prefix}%') \
                     .order('citation_number', desc=True).limit(1).execute()
                 
                 if response.data:
+                    # int() will correctly parse numbers with leading zeros (e.g., int('042...'))
                     last_known_id = int(response.data[0]['citation_number'])
                 else:
                     last_known_id = fallback_id
@@ -94,7 +96,16 @@ def run_scrape():
 
             # 2. Continuously scrape in batches of 5
             while True:
-                batch_ids_to_check = [str(last_known_id + i) for i in range(1, 6)]
+                batch_ids_to_check = []
+                for i in range(1, 6):
+                    next_id_num = last_known_id + i
+                    next_id_str = str(next_id_num)
+                    # If the prefix is '04', prepend a '0' to the generated ID for the URL.
+                    if prefix == "04":
+                        batch_ids_to_check.append("0" + next_id_str)
+                    else:
+                        batch_ids_to_check.append(next_id_str)
+
                 batch_results = []
                 
                 for cid in batch_ids_to_check:
@@ -105,7 +116,6 @@ def run_scrape():
                 if batch_results:
                     found_citations.extend(batch_results)
 
-                # NEW STOP CONDITION: Only stop if the last ID in the batch was not found.
                 last_id_in_batch = batch_ids_to_check[-1]
                 found_numbers_in_batch = {item['citation_number'] for item in batch_results}
 
@@ -113,7 +123,6 @@ def run_scrape():
                     print(f"Last ID in batch ({last_id_in_batch}) was not found. Stopping series '{prefix}'.")
                     break
                 
-                # If the last ID was found, continue to the next batch
                 print(f"Last ID in batch ({last_id_in_batch}) was found. Continuing to next batch...")
                 last_known_id = int(last_id_in_batch)
 
