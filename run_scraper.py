@@ -56,21 +56,46 @@ def run_scrape():
         return
     supabase: Client = create_client(url, key)
 
-    # 1. Get the latest citation number from the database
-    try:
-        response = supabase.table('citations').select('citation_number').order('citation_number', desc=True).limit(1).execute()
-        if response.data:
-            last_known_id = int(response.data[0]['citation_number'])
-        else:
-            last_known_id = 7325173198 # Fallback for the first run
-    except Exception as e:
-        print(f"Error fetching last known ID from Supabase: {e}")
-        return # Exit if we can't connect to the DB
+    # 1. Define the citation prefixes and their fallback starting IDs
+    citation_series = {
+        "73": 7325173198,   # Original series
+        "11": 1125009340,   # New series
+        "4":  425039555     # New series (leading zero is ignored)
+    }
 
-    print(f"Starting scrape after last known ID: {last_known_id}")
+    ids_to_check = []
+    print("Preparing to check citation series...")
+
+    # 2. For each series, find the last known ID and generate the next 5
+    for prefix, fallback_id in citation_series.items():
+        try:
+            # Query for the latest citation_number that starts with the prefix
+            response = supabase.table('citations').select('citation_number') \
+                .like('citation_number', f'{prefix}%') \
+                .order('citation_number', desc=True).limit(1).execute()
+            
+            if response.data:
+                last_known_id = int(response.data[0]['citation_number'])
+                print(f"  - Series '{prefix}': Last known ID is {last_known_id}.")
+            else:
+                last_known_id = fallback_id
+                print(f"  - Series '{prefix}': No previous data. Starting with fallback ID {last_known_id}.")
+            
+            # Add the next 5 IDs for this series to our main list
+            ids_to_check.extend([str(last_known_id + i) for i in range(1, 6)])
+
+        except Exception as e:
+            print(f"Error fetching last known ID for prefix '{prefix}': {e}")
+            # If DB query fails for one prefix, we can still continue with others
+            continue
     
-    # 2. Scrape for new citations
-    ids_to_check = [str(last_known_id + i) for i in range(1, 6)]
+    if not ids_to_check:
+        print("Could not generate any IDs to check. Exiting.")
+        return
+        
+    print(f"\nTotal IDs to check: {len(ids_to_check)}")
+    
+    # 3. Scrape for new citations
     found_citations = []
     
     # --- Setup WebDriver ---
@@ -88,16 +113,16 @@ def run_scrape():
     finally:
         driver.quit()
 
-    # 3. Insert new citations into the database
+    # 4. Insert new citations into the database
     if found_citations:
-        print(f"Found {len(found_citations)} new citations. Inserting into database...")
+        print(f"\nFound {len(found_citations)} new citations. Inserting into database...")
         try:
             supabase.table('citations').upsert(found_citations).execute()
             print("Successfully inserted new citations.")
         except Exception as e:
             print(f"Error inserting data into Supabase: {e}")
     else:
-        print("No new citations found in the checked range.")
+        print("\nNo new citations found in the checked range.")
 
 if __name__ == "__main__":
     run_scrape()
