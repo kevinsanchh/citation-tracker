@@ -5,12 +5,26 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from supabase import create_client, Client
+import pytz
 
 def parse_and_format_date(date_str: str) -> str:
-    """Parses '9/23/25 6:05 PM' into an ISO 8601 string for PostgreSQL."""
+    """
+    Parses a naive date string (e.g., '9/23/25 6:05 PM'), localizes it to
+    US/Eastern time, and returns a proper ISO 8601 string with timezone info.
+    """
     try:
-        dt_object = datetime.strptime(date_str, "%m/%d/%y %I:%M %p")
-        return dt_object.isoformat()
+        # Define the timezone for Florida (handles EST/EDT)
+        eastern_tz = pytz.timezone('America/New_York')
+        
+        # 1. Parse the string into a naive datetime object
+        naive_dt = datetime.strptime(date_str, "%m/%d/%y %I:%M %p")
+        
+        # 2. Localize the naive datetime, making it timezone-aware
+        aware_dt = eastern_tz.localize(naive_dt)
+        
+        # 3. Return the ISO 8601 formatted string. It will now include the correct UTC offset.
+        # Example output: '2025-09-23T18:05:00-04:00'
+        return aware_dt.isoformat()
     except ValueError:
         print(f"Error parsing date: {date_str}")
         return None
