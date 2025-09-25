@@ -31,15 +31,30 @@ def scrape_citation_data(driver, citation_id):
             print(f"Valid citation found: {citation_id}")
             cells = driver.find_elements(By.CSS_SELECTOR, "tbody > tr[data-ng-repeat] > td")
             
-            if len(cells) >= 7:
+            # The amount is the 8th column (index 7), so we check for at least 8 cells.
+            if len(cells) >= 8:
                 raw_date_str = cells[2].text
                 formatted_date = parse_and_format_date(raw_date_str)
+
+                # Scrape and clean the amount
+                amount = None
+                try:
+                    # Get the raw text (e.g., "$30.00")
+                    raw_amount_str = cells[7].text
+                    # Remove the '$' and convert to a float number
+                    amount = float(raw_amount_str.replace('$', '').strip())
+                except (ValueError, IndexError):
+                    # If the amount can't be parsed or isn't there, default to None (NULL in DB)
+                    print(f"Warning: Could not parse amount for citation {citation_id}")
+                    pass
+
                 if formatted_date:
                     citation_data = {
                         "citation_number": cells[1].text,
                         "citation_date": formatted_date,
                         "violation": cells[5].text,
-                        "location": cells[6].text
+                        "location": cells[6].text,
+                        "amount": amount, # Add the new amount field
                     }
     except Exception as e:
         print(f"An error occurred while checking {citation_id}: {e}")
