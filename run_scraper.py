@@ -59,12 +59,11 @@ def run_scrape():
     citation_series = {
         "73": 7325173198,
         "11": 1125009340,
-        "04": 425039555  # Now using '04' as the prefix key
+        "04": 425039555
     }
     
     found_citations = []
     
-    # --- Setup WebDriver ---
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
@@ -72,18 +71,15 @@ def run_scrape():
     driver = webdriver.Chrome(options=options)
 
     try:
-        # 1. For each series, find the last known ID and start scraping
         for prefix, fallback_id in citation_series.items():
             print(f"\n--- Starting check for series with prefix '{prefix}' ---")
             last_known_id = 0
             try:
-                # This query now uses the prefix directly (e.g., '04%')
                 response = supabase.table('citations').select('citation_number') \
                     .like('citation_number', f'{prefix}%') \
                     .order('citation_number', desc=True).limit(1).execute()
                 
                 if response.data:
-                    # int() will correctly parse numbers with leading zeros (e.g., int('042...'))
                     last_known_id = int(response.data[0]['citation_number'])
                 else:
                     last_known_id = fallback_id
@@ -94,20 +90,18 @@ def run_scrape():
                 print(f"Error fetching last known ID for prefix '{prefix}': {e}")
                 continue
 
-            # 2. Continuously scrape in batches of 5
             while True:
+                # --- "WALKING" STATE ---
                 batch_ids_to_check = []
                 for i in range(1, 6):
                     next_id_num = last_known_id + i
                     next_id_str = str(next_id_num)
-                    # If the prefix is '04', prepend a '0' to the generated ID for the URL.
                     if prefix == "04":
                         batch_ids_to_check.append("0" + next_id_str)
                     else:
                         batch_ids_to_check.append(next_id_str)
 
                 batch_results = []
-                
                 for cid in batch_ids_to_check:
                     result = scrape_citation_data(driver, cid)
                     if result:
@@ -119,20 +113,42 @@ def run_scrape():
                 last_id_in_batch = batch_ids_to_check[-1]
                 found_numbers_in_batch = {item['citation_number'] for item in batch_results}
 
-                if last_id_in_batch not in found_numbers_in_batch:
-                    print(f"Last ID in batch ({last_id_in_batch}) was not found. Stopping series '{prefix}'.")
-                    break
-                
-                print(f"Last ID in batch ({last_id_in_batch}) was found. Continuing to next batch...")
-                last_known_id = int(last_id_in_batch)
+                if last_id_in_batch in found_numbers_in_batch:
+                    print(f"Last ID in batch ({last_id_in_batch}) was found. Continuing to next batch...")
+                    last_known_id = int(last_id_in_batch)
+                    continue # Continue the 'while' loop to the next batch
+                else:
+                    # --- "PROBING" STATE ---
+                    print(f"Last ID in batch ({last_id_in_batch}) not found. Probing for jumps...")
+                    probe_intervals = [20, 50, 100, 200] # Distances to jump ahead
+                    probe_successful = False
 
+                    for interval in probe_intervals:
+                        probe_id_num = int(last_id_in_batch) + interval
+                        probe_id_str = str(probe_id_num)
+                        if prefix == "04":
+                           probe_id_str = "0" + probe_id_str
+
+                        result = scrape_citation_data(driver, probe_id_str)
+                        if result:
+                            print(f"Probe successful! Found new valid ID {result['citation_number']} at interval +{interval}.")
+                            found_citations.append(result)
+                            # Reset last_known_id to one before the newly found ID to restart the "walk" from there.
+                            last_known_id = int(result['citation_number']) - 1
+                            probe_successful = True
+                            break # Exit the probe loop
+                    
+                    if not probe_successful:
+                        print("All probes failed. Assuming no new citations for this series.")
+                    
+                    # In either probe case (success or fail), we are done with this series for now.
+                    break # Exit the 'while' loop for this prefix.
     finally:
         driver.quit()
 
-    # 3. Insert new citations into the database
+    # Insert all unique citations found during the entire run
     if found_citations:
         unique_citations = list({item['citation_number']: item for item in found_citations}.values())
-        
         print(f"\nFound a total of {len(unique_citations)} unique new citations. Inserting into database...")
         try:
             supabase.table('citations').upsert(unique_citations).execute()
