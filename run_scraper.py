@@ -5,31 +5,29 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from supabase import create_client, Client
-import pytz
 # --- ADD THESE IMPORTS for Explicit Waits ---
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 # ---
+from zoneinfo import ZoneInfo 
 
 
 def parse_and_format_date(date_str: str) -> str:
     """
-    Parses a naive date string (e.g., '9/23/25 6:05 PM'), localizes it to
-    US/Eastern time, and returns a proper ISO 8601 string with timezone info.
+    Parses a naive date string (e.g., '9/23/25 6:05 PM'), explicitly attaches
+    the US/Eastern timezone, and returns a proper ISO 8601 string.
     """
     try:
-        # Define the timezone for Florida (handles EST/EDT)
-        eastern_tz = pytz.timezone('America/New_York')
-        
-        # 1. Parse the string into a naive datetime object
+        # 1. Parse the string into a naive datetime object (no timezone info yet)
         naive_dt = datetime.strptime(date_str, "%m/%d/%y %I:%M %p")
         
-        # 2. Localize the naive datetime, making it timezone-aware
-        aware_dt = eastern_tz.localize(naive_dt)
+        # 2. Attach the correct timezone information.
+        # This tells Python "this moment in time happened in the America/New_York timezone".
+        aware_dt = naive_dt.replace(tzinfo=ZoneInfo("America/New_York"))
         
-        # 3. Return the ISO 8601 formatted string. It will now include the correct UTC offset.
-        # Example output: '2025-09-23T18:05:00-04:00'
+        # 3. Return the ISO 8601 formatted string.
+        # Python will now correctly convert the time to the true UTC equivalent for the ISO string.
         return aware_dt.isoformat()
     except ValueError:
         print(f"Error parsing date: {date_str}")
