@@ -5,60 +5,19 @@ import { PostgrestError } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 // This function does the date formatting on the server
 function formatRelativeTime(citationDateString: string): string {
-  // Step 1: Get the raw date string from the DB (e.g., "2025-09-25T19:31:00+00:00")
-  const dbDate = new Date(citationDateString);
-
-  // Step 2: Extract the year, month, day, hours, etc., in UTC.
-  // This effectively treats the stored time as the "wall clock" time we want.
-  const year = dbDate.getUTCFullYear();
-  const month = dbDate.getUTCMonth();
-  const day = dbDate.getUTCDate();
-  const hours = dbDate.getUTCHours();
-  const minutes = dbDate.getUTCMinutes();
-  const seconds = dbDate.getUTCSeconds();
-
-  // Step 3: Create a new Date object by explicitly telling JavaScript that these
-  // components belong to the "America/New_York" timezone.
-  // We do this by constructing a new timezone-aware string.
-  // Note: Months are 0-indexed in JS, so we don't need to adjust.
-  const correctedDateString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(
-    2,
-    "0"
-  )}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
-    seconds
-  ).padStart(2, "0")}`;
-
-  // By creating the date this way, the JS engine correctly interprets the wall-clock time in the context of the specified timezone.
-  const citationDate = new Date(
-    new Date(correctedDateString).toLocaleString("en-US", { timeZone: "America/New_York" })
-  );
-
-  const now = new Date(); // Current server time (UTC)
-
-  // --- Debugging Logs ---
-  console.log(`[TIME DEBUG] Original DB String: ${citationDateString}`);
-  console.log(
-    `[TIME DEBUG] Corrected Citation Date (EST): ${citationDate.toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      dateStyle: "long",
-      timeStyle: "long",
-    })}`
-  );
-  console.log(
-    `[TIME DEBUG] Current Time (EST): ${now.toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      dateStyle: "long",
-      timeStyle: "long",
-    })}`
-  );
-  // ---
+  // The string from the DB is now a correct, timezone-aware ISO string.
+  // The JS Date constructor will parse it correctly into the right moment in time.
+  const citationDate = new Date(citationDateString);
+  const now = new Date(); // The current time on the server (in UTC)
 
   const diffMs = now.getTime() - citationDate.getTime();
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMinutes / 60);
+  const diffMinutes = Math.round(diffMs / (1000 * 60)); // Use round for closer accuracy
+  const diffHours = Math.round(diffMinutes / 60);
 
-  console.log(`[TIME DEBUG] Difference - Minutes: ${diffMinutes}, Hours: ${diffHours}`);
-  console.log("---");
+  // --- Optional: Add a log to confirm the correct difference ---
+  console.log(`[TIME DEBUG] Citation Date/Time: ${citationDate}`);
+  console.log(`[TIME DEBUG] Current Date/Time: ${now}`);
+  console.log(`[TIME DEBUG] Correct difference in minutes: ${diffMinutes}`);
 
   if (diffMinutes < 1) return "just now";
   if (diffMinutes < 60) return `${diffMinutes} min. ago`;
