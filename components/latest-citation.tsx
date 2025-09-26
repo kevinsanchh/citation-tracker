@@ -69,7 +69,7 @@ export default function LatestCitation() {
 
   const {
     data: dailyTotals,
-    error: totalsError,
+    error: _totalsError,
     isLoading: totalsLoading,
   } = useSWR<DailyTotal[]>("/api/daily-totals", fetcher, {
     /* swr options */

@@ -122,11 +122,10 @@ export async function GET() {
     });
 
     return NextResponse.json(latestCitations);
-  } catch (e: any) {
+  } catch (e) {
+    const error = e as Error;
+    // Now you can safely use error.message
+    return NextResponse.json({ error: error.message }, { status: 500 });
     // ... (error handling is the same) ...
-    return NextResponse.json(
-      { error: "Failed to fetch data from the database.", details: e.message },
-      { status: 500 }
-    );
   }
 }
