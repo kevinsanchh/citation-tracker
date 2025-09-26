@@ -40,25 +40,22 @@ def scrape_citation_data(driver, citation_id):
         driver.get(url)
         time.sleep(2) 
 
-        error_alert = driver.find_element(By.CSS_SELECTOR, "div.alert.alert-danger")
-        if error_alert.get_attribute("aria-hidden") == "true":
+        # The new, more reliable check: Find the results header.
+        results_header = driver.find_element(By.CSS_SELECTOR, "h2.theme-brand-color")
+        
+        # Check if the text content is "1 Results". This is our new definition of a valid citation.
+        if "1 Results" in results_header.text:
             print(f"Valid citation found: {citation_id}")
             cells = driver.find_elements(By.CSS_SELECTOR, "tbody > tr[data-ng-repeat] > td")
             
-            # The amount is the 8th column (index 7), so we check for at least 8 cells.
             if len(cells) >= 8:
                 raw_date_str = cells[2].text
                 formatted_date = parse_and_format_date(raw_date_str)
-
-                # Scrape and clean the amount
                 amount = None
                 try:
-                    # Get the raw text (e.g., "$30.00")
                     raw_amount_str = cells[7].text
-                    # Remove the '$' and convert to a float number
                     amount = float(raw_amount_str.replace('$', '').strip())
                 except (ValueError, IndexError):
-                    # If the amount can't be parsed or isn't there, default to None (NULL in DB)
                     print(f"Warning: Could not parse amount for citation {citation_id}")
                     pass
 
@@ -68,10 +65,13 @@ def scrape_citation_data(driver, citation_id):
                         "citation_date": formatted_date,
                         "violation": cells[5].text,
                         "location": cells[6].text,
-                        "amount": amount, # Add the new amount field
+                        "amount": amount,
                     }
     except Exception as e:
-        print(f"An error occurred while checking {citation_id}: {e}")
+        # If the h2 tag is not found or any other error occurs, we assume it's invalid.
+        # We can add a more specific log if needed, but for now, this is safe.
+        # print(f"An error occurred while checking {citation_id}: {e}")
+        pass # Silently continue, as an error here usually means the page is invalid.
         
     return citation_data
 
