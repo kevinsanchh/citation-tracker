@@ -1,14 +1,4 @@
-import { DeployButton } from "@/components/deploy-button";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
-import { Hero } from "@/components/hero";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
-import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
-import { hasEnvVars } from "@/lib/utils";
-import Link from "next/link";
 import MapComponent from "@/components/tutorial/map";
-import LatestCitation from "@/components/latest-citation";
 import AnimatedTabs from "@/components/animated-tabs";
 
 export default function Home() {
@@ -20,7 +10,7 @@ export default function Home() {
         </div>
         <AnimatedTabs />
       </div>
-      <MapComponent />
+      {/* <MapComponent /> */}
     </main>
   );
 }

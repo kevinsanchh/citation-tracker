@@ -17,7 +17,9 @@ export async function GET() {
     }
 
     return NextResponse.json(data);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+  } catch (e) {
+    const error = e as Error;
+    // Now you can safely use error.message
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
