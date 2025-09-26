@@ -6,6 +6,12 @@ from selenium.webdriver.chrome.options import Options
 from datetime import datetime
 from supabase import create_client, Client
 import pytz
+# --- ADD THESE IMPORTS for Explicit Waits ---
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+# ---
+
 
 def parse_and_format_date(date_str: str) -> str:
     """
@@ -30,7 +36,7 @@ def parse_and_format_date(date_str: str) -> str:
         return None
 
 def scrape_citation_data(driver, citation_id):
-    """Checks a citation ID using an existing webdriver instance."""
+    """Checks a citation ID using an existing webdriver instance with explicit waits."""
     print(f"Checking ID: {citation_id}...")
     base_url = "https://fiu.nupark.com/v2/portal/citations#/citation/citationSelect/"
     url = f"{base_url}{citation_id}//10"
@@ -38,40 +44,46 @@ def scrape_citation_data(driver, citation_id):
     citation_data = None
     try:
         driver.get(url)
-        time.sleep(2) 
-
-        # The new, more reliable check: Find the results header.
-        results_header = driver.find_element(By.CSS_SELECTOR, "h2.theme-brand-color")
         
-        # Check if the text content is "1 Results". This is our new definition of a valid citation.
-        if "1 Results" in results_header.text:
-            print(f"Valid citation found: {citation_id}")
-            cells = driver.find_elements(By.CSS_SELECTOR, "tbody > tr[data-ng-repeat] > td")
-            
-            if len(cells) >= 8:
-                raw_date_str = cells[2].text
-                formatted_date = parse_and_format_date(raw_date_str)
-                amount = None
-                try:
-                    raw_amount_str = cells[7].text
-                    amount = float(raw_amount_str.replace('$', '').strip())
-                except (ValueError, IndexError):
-                    print(f"Warning: Could not parse amount for citation {citation_id}")
-                    pass
+        # --- THE DEFINITIVE WAIT LOGIC ---
+        # Wait up to 5 seconds for a <tr> element to appear inside the <tbody>.
+        # This element ONLY exists if a citation is valid and its data has been loaded.
+        # This completely avoids the race condition with the h2 text changing.
+        wait = WebDriverWait(driver, 5) # 5 seconds is plenty for this check
+        locator = (By.CSS_SELECTOR, "tbody > tr[data-ng-repeat]")
+        wait.until(EC.presence_of_element_located(locator))
+        # --- END NEW LOGIC ---
 
-                if formatted_date:
-                    citation_data = {
-                        "citation_number": cells[1].text,
-                        "citation_date": formatted_date,
-                        "violation": cells[5].text,
-                        "location": cells[6].text,
-                        "amount": amount,
-                    }
+        # If the wait above succeeds, we are 100% certain the citation is valid.
+        print(f"Valid citation found: {citation_id}")
+        cells = driver.find_elements(By.CSS_SELECTOR, "tbody > tr[data-ng-repeat] > td")
+        
+        if len(cells) >= 8:
+            raw_date_str = cells[2].text
+            formatted_date = parse_and_format_date(raw_date_str)
+            amount = None
+            try:
+                raw_amount_str = cells[7].text
+                amount = float(raw_amount_str.replace('$', '').strip())
+            except (ValueError, IndexError):
+                print(f"Warning: Could not parse amount for citation {citation_id}")
+                pass
+
+            if formatted_date:
+                citation_data = {
+                    "citation_number": cells[1].text,
+                    "citation_date": formatted_date,
+                    "violation": cells[5].text,
+                    "location": cells[6].text,
+                    "amount": amount,
+                }
+    except TimeoutException:
+        # This will now only happen if the data row never appears after 5 seconds,
+        # which is the correct and reliable way to identify an invalid citation.
+        pass
     except Exception as e:
-        # If the h2 tag is not found or any other error occurs, we assume it's invalid.
-        # We can add a more specific log if needed, but for now, this is safe.
-        # print(f"An error occurred while checking {citation_id}: {e}")
-        pass # Silently continue, as an error here usually means the page is invalid.
+        print(f"An unexpected error occurred while checking {citation_id}: {e}")
+        pass
         
     return citation_data
 
