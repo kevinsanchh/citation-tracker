@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { PostgrestError } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 // This function does the date formatting on the server
@@ -70,7 +71,7 @@ function formatRelativeTime(citationDateString: string): string {
 // UPDATED: Type definitions to include citation_number
 // Update the type definitions to include the raw date
 type QueryResultData = { citation_date: string; location: string };
-type QueryResult = { data: QueryResultData[] | null; error: any };
+type QueryResult = { data: QueryResultData[] | null; error: PostgrestError | null };
 
 export async function GET() {
   try {
