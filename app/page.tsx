@@ -10,7 +10,7 @@ export default function Home() {
         </div>
         <AnimatedTabs />
       </div>
-      {/* map */}
+      {/*the map */}
       <MapComponent />
     </main>
   );
