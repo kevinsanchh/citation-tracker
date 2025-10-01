@@ -113,14 +113,14 @@ export default function LatestCitation() {
         return (
           <div
             key={item.prefix}
-            className="flex flex-row active:bg-[#017AFF] active:text-white gap-3 rounded-md p-2 py-4"
+            className="flex flex-row active:bg-[#017AFF] active:text-white gap-3 rounded-md p-2 py-4 cursor-pointer"
           >
-            <div className="aspect-square relative size-11 stroke-current rounded-full border-[3px] border-white ">
-              <div className="absolute w-full h-full bg-[#9297A3] text-white rounded-full p-2 flex justify-center items-center font-bold">
+            <div className="select-none aspect-square relative size-11 stroke-current rounded-full border-[3px] border-white ">
+              <div className="select-none absolute w-full h-full bg-[#9297A3] text-white rounded-full p-2 flex justify-center items-center font-bold">
                 {prefixMap[item.prefix] || item.prefix}
               </div>
             </div>
-            <div className="flex flex-col w-full gap-0.5 ">
+            <div className="flex flex-col w-full gap-0.5 min-w-0">
               <div className="flex justify-between  items-center">
                 <h1 className="font-bold text-black text-sm">
                   Officer {prefixMap[item.prefix] || item.prefix}
@@ -128,10 +128,12 @@ export default function LatestCitation() {
                 {/* UPDATED: Display the total for today */}
                 <h1 className="text-[#898989] text-xs">${totalToday.toFixed(2)} tdy.</h1>
               </div>
-              <div className="flex flex-row gap-2">
-                <h1 className="text-[#898989] text-xs">{formatLocation(item.location)}</h1>
-                <h1 className="text-[#898989] text-xs">•</h1>
-                <h1 className="text-[#898989] text-xs">{item.date}</h1>
+              <div className="flex flex-row gap-2 overflow-hidden">
+                <h1 className="text-[#898989] text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                  {formatLocation(item.location)}
+                </h1>
+                <h1 className="text-[#898989] text-xs shrink-0">•</h1>
+                <h1 className="text-[#898989] text-xs shrink-0">{item.date}</h1>
               </div>
             </div>
           </div>
