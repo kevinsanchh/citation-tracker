@@ -11,7 +11,7 @@ export default function Home() {
         <AnimatedTabs />
       </div>
       {/*the map */}
-      <MapComponent />
+      {/* <MapComponent /> */}
     </main>
   );
 }
