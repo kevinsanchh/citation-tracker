@@ -17,6 +17,103 @@
 </p>
 <br/>
 
+## How this repository works
+
+This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (Postgres + Auth), Mapbox for the campus map, and a small Python Selenium scraper that writes new citations into the database.
+
+- Frontend (Next.js):
+
+  - `app/page.tsx` renders the main UI: a sidebar with tabs and a Mapbox map (`components/tutorial/map.tsx`).
+  - `components/latest-citation.tsx` uses SWR to call two API routes and shows the latest citation per officer prefix along with today’s total amount per prefix.
+  - Tailwind and shadcn/ui handle styling.
+
+- API routes (Next.js):
+
+  - `GET /api/citations` (`app/api/citations/route.ts`): queries Supabase for the most recent `citation_date` and `location` for the prefixes 73, 11, 04. It returns a list with a human-friendly “x min/hr ago” string and the raw ISO timestamp for sorting.
+  - `GET /api/daily-totals` (`app/api/daily-totals/route.ts`): calls the Postgres function `get_daily_totals` via `supabase.rpc(...)` to fetch today’s summed `amount` per prefix.
+
+- Data source (Supabase):
+
+  - Table (expected): `citations(citation_number text primary key, citation_date timestamptz, violation text, location text, amount numeric)`.
+  - Database function (expected): `get_daily_totals()` that returns rows like `{ prefix text, total_amount numeric }` for “today”. This is used by the `/api/daily-totals` route.
+
+- Scraper (Python):
+  - `run_scraper.py` uses Selenium to probe FIU’s citation portal for new IDs, parses the citation row if present, normalizes `citation_date` into a timezone-aware ISO string, and upserts rows into the `citations` table using the Supabase Python client.
+  - Intended to run on a schedule (e.g., GitHub Actions), but can also be run locally.
+
+### Environment variables
+
+Next.js app
+
+Required:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` (this repo uses the new “publishable” key name)
+- `NEXT_PUBLIC_MAPBOX_TOKEN` (Mapbox access token for the campus map)
+
+Python scraper
+
+Required:
+
+- `SUPABASE_URL` (same as `NEXT_PUBLIC_SUPABASE_URL`)
+- `SUPABASE_ANON_KEY` (anon key with insert permissions via RLS/policies as appropriate)
+
+### Run the Next.js app locally
+
+1. Install dependencies
+
+```bash
+npm install
+```
+
+2. Create `.env.local` with the variables above
+
+```bash
+echo "NEXT_PUBLIC_SUPABASE_URL=..." >> .env.local
+echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=..." >> .env.local
+echo "NEXT_PUBLIC_MAPBOX_TOKEN=..." >> .env.local
+```
+
+3. Start the dev server
+
+```bash
+npm run dev
+```
+
+Open http://localhost:3000. The sidebar should show the latest citation per prefix and today’s totals if your database has data.
+
+### Run the scraper locally (optional)
+
+1. Create and activate a virtual environment, then install Python deps
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+2. Export the Supabase environment variables (zsh)
+
+```bash
+export SUPABASE_URL=...
+export SUPABASE_ANON_KEY=...
+```
+
+3. Ensure you have a recent Google Chrome; Selenium will auto-manage the driver in recent versions. Then run:
+
+```bash
+python run_scraper.py
+```
+
+Newly found citations will be upserted into the `citations` table.
+
+### Notes on Auth & Middleware
+
+- Supabase SSR is set up in `lib/supabase/server.ts` and `lib/supabase/client.ts`.
+- `middleware.ts` initializes the Supabase client so cookies/sessions stay in sync. A protected page example lives under `app/protected/` (redirects unauthenticated users).
+
+If you need help wiring the `citations` table and `get_daily_totals()` function, ask and we can add the SQL scaffold directly to this repo.
+
 ## Features
 
 - Works across the entire [Next.js](https://nextjs.org) stack
