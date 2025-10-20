@@ -108,7 +108,7 @@ function isRecentCitation(rawDate: string | null): boolean {
   if (!rawDate) return false;
   const citationTime = new Date(rawDate).getTime();
   const now = new Date().getTime();
-  const thirtyMinutesInMs = 30 * 60 * 1000;
+  const thirtyMinutesInMs = 30 * 60 * 1000 * 6;
   return now - citationTime < thirtyMinutesInMs;
 }
 
