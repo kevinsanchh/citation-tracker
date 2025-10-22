@@ -46,7 +46,7 @@ const DragCloseDrawer = ({ children }: { children: React.ReactNode }) => {
     <motion.div
       id="drawer"
       onClick={(e) => e.stopPropagation()}
-      className="fixed top-0 left-0 right-0 w-full h-full rounded-t-3xl bg-neutral-900"
+      className="fixed top-0 left-0 right-0 w-full h-full border-[0.5px] border-white/80 rounded-t-3xl bg-white/15 backdrop-blur-xl"
       style={{ y }}
       drag="y"
       dragControls={controls}
@@ -65,9 +65,9 @@ const DragCloseDrawer = ({ children }: { children: React.ReactNode }) => {
         onPointerDown={(e) => {
           controls.start(e);
         }}
-        className="absolute left-0 right-0 top-0 z-10 flex h-12 cursor-grab touch-none items-center justify-center rounded-t-3xl bg-neutral-900 active:cursor-grabbing"
+        className="absolute left-0 right-0 top-0 z-10 flex  h-12 cursor-grab touch-none items-center justify-center rounded-t-3xl bg-transparent active:cursor-grabbing"
       >
-        <div className="h-2 w-14 rounded-full bg-neutral-700" />
+        <div className="h-2 w-14 rounded-full bg-neutral-400" />
       </div>
       <div className="relative z-0 h-full overflow-y-scroll p-4 pt-12">{children}</div>
     </motion.div>
@@ -76,7 +76,7 @@ const DragCloseDrawer = ({ children }: { children: React.ReactNode }) => {
 
 export const DragCloseDrawerExample = () => {
   return (
-    <div className="grid h-screen place-content-center bg-neutral-950">
+    <div className="grid h-screen place-content-center bg-transparent">
       <DragCloseDrawer>
         <div className="mx-auto max-w-2xl space-y-4 text-neutral-400">
           <LatestCitation />
