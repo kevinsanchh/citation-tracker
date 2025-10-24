@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Map from "react-map-gl/mapbox";
 import { Source, Layer, type LayerSpecification } from "react-map-gl/mapbox";
 
@@ -53,12 +53,13 @@ const parkingGarageLabelStyle: LayerSpecification = {
 
 export default function MapComponent() {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const initialZoom = typeof window !== "undefined" ? (window.innerWidth >= 768 ? 16 : 14) : 16;
 
   // Set up the initial viewport state
   const initialViewState = {
     longitude: -80.375,
     latitude: 25.757,
-    zoom: 16,
+    zoom: initialZoom,
   };
 
   return (
