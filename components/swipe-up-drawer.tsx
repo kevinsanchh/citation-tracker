@@ -15,7 +15,7 @@ const DragCloseDrawer = ({ children }: { children: React.ReactNode }) => {
 
   const controls = useDragControls();
 
-  const onDragEnd = (_: any, info: PanInfo) => {
+  const onDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const fullyOpenY = windowHeight * 0.2;
     const regularY = windowHeight * (1 - 1 / 3);
     const minimizedY = windowHeight - 80;
