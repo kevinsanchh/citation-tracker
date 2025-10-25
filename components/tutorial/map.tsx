@@ -7,6 +7,7 @@ import {
   Source,
   Layer,
   Marker,
+  Popup,
   type LayerSpecification,
 } from "react-map-gl/mapbox";
 import useSWR from "swr";
@@ -49,6 +50,12 @@ interface LatestCitationInfo {
   date: string;
   location: string;
   rawDate: string | null;
+}
+
+// ✨ NEW: Interface for daily totals
+interface DailyTotal {
+  prefix: string;
+  total_amount: number;
 }
 
 const parkingGarageFillStyle: LayerSpecification = {
@@ -103,23 +110,43 @@ const fetcher = (key: string) =>
     return res.json();
   });
 
-// Helper function to check if citation is recent (within last 30 minutes)
+// Helper function to check if citation is recent (within last 10 hours)
 function isRecentCitation(rawDate: string | null): boolean {
   if (!rawDate) return false;
   const citationTime = new Date(rawDate).getTime();
   const now = new Date().getTime();
-  const thirtyMinutesInMs = 30 * 60 * 1000 * 6;
-  return now - citationTime < thirtyMinutesInMs;
+  const tenHoursInMs = 10 * 60 * 60 * 10000000;
+  return now - citationTime < tenHoursInMs;
 }
 
 // Helper function to normalize location string for lookup
 function normalizeLocation(location: string): string {
-  // Extract just the location code (e.g., "PG1: GOLD GARAGE" from full string)
   return location.toUpperCase().trim();
+}
+
+// ✨ NEW: Format location for display (matching your latest-citation component)
+function formatLocation(locationStr: string): string {
+  const parts = locationStr.split(":");
+  if (parts.length < 2) {
+    return locationStr;
+  }
+
+  const prefix = parts[0];
+  const description = parts[1].trim();
+
+  const titleCasedDescription = description
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+  return `${prefix}: ${titleCasedDescription}`;
 }
 
 export default function MapComponent() {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  // ✨ NEW: State to track which officer's popup is open
+  const [selectedOfficer, setSelectedOfficer] = useState<string | null>(null);
 
   // Fetch latest citations
   const { data: latestCitations } = useSWR<LatestCitationInfo[]>(
@@ -127,6 +154,16 @@ export default function MapComponent() {
     fetcher,
     {
       refreshInterval: 30000, // Refresh every 30 seconds
+      revalidateOnFocus: false,
+    }
+  );
+
+  // ✨ NEW: Fetch daily totals
+  const { data: dailyTotals } = useSWR<DailyTotal[]>(
+    "/api/daily-totals",
+    fetcher,
+    {
+      refreshInterval: 30000,
       revalidateOnFocus: false,
     }
   );
@@ -144,6 +181,11 @@ export default function MapComponent() {
     return LOCATION_COORDINATES[normalizedLocation] !== undefined;
   });
 
+  // ✨ NEW: Create a map for quick lookup of daily totals
+  const totalsMap = new globalThis.Map<string, number>(
+    dailyTotals?.map((item) => [item.prefix, item.total_amount]) ?? []
+  );
+
   return (
     <Map
       mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
@@ -152,6 +194,8 @@ export default function MapComponent() {
       mapStyle="mapbox://styles/mapbox/standard"
       minZoom={13}
       onLoad={() => setIsMapLoaded(true)}
+      // ✨ NEW: Close popup when clicking on the map
+      onClick={() => setSelectedOfficer(null)}
     >
       {isMapLoaded && (
         <Source
@@ -174,27 +218,79 @@ export default function MapComponent() {
 
         const [latitude, longitude] = coordinates;
         const officerNumber = prefixMap[citation.prefix] || citation.prefix;
+        const totalToday = totalsMap.get(citation.prefix) || 0;
 
         return (
-          <Marker
-            key={citation.prefix}
-            latitude={latitude}
-            longitude={longitude}
-            anchor="bottom"
-          >
-            <div className="relative flex flex-col items-center">
-              {/* Pulsing animation ring */}
-              <div className="absolute -top-6 animate-ping w-12 h-12 rounded-full bg-red-500 opacity-75" />
+          <React.Fragment key={citation.prefix}>
+            <Marker
+              latitude={latitude}
+              longitude={longitude}
+              anchor="bottom"
+              // ✨ NEW: Handle marker click
+              onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                setSelectedOfficer(citation.prefix);
+              }}
+            >
+              <div className="relative flex flex-col items-center cursor-pointer">
+                {/* Pulsing animation ring */}
+                <div
+                  className="absolute -top-2 w-12 h-12 rounded-full bg-green-500 opacity-75"
+                  style={{
+                    animation: "ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite",
+                  }}
+                />
 
-              {/* Officer pin */}
-              <div className="relative bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-sm shadow-lg border-2 border-white z-10">
-                {officerNumber}
+                {/* Officer pin */}
+                <div className="relative bg-[#9297A3] text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-sm shadow-lg border-2 border-white z-10 hover:scale-110 transition-transform">
+                  {officerNumber}
+                </div>
+
+                {/* Pin pointer */}
+                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-gray-400 -mt-1" />
               </div>
+            </Marker>
 
-              {/* Pin pointer */}
-              <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-red-500 -mt-1" />
-            </div>
-          </Marker>
+            {/* ✨ Popup positioned above the pin */}
+            {/* ✨ Popup positioned above the pin */}
+            {selectedOfficer === citation.prefix && (
+              <Popup
+                latitude={latitude}
+                longitude={longitude}
+                anchor="bottom"
+                onClose={() => setSelectedOfficer(null)}
+                closeButton={false} // ✨ NEW: Removes the X button
+                closeOnClick={false}
+                offset={50}
+                className="officer-popup"
+              >
+                <div className="p-3 min-w-[200px]">
+                  {" "}
+                  {/* ✨ ADDED: rounded-xl for more rounded corners */}
+                  {/* Citation details */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h1 className="font-bold text-black text-sm">
+                        Officer {officerNumber}
+                      </h1>
+                      <h1 className="text-[#898989] text-xs">
+                        ${totalToday.toFixed(2)} tdy.
+                      </h1>
+                    </div>
+                    <div className="flex flex-row gap-2 overflow-hidden">
+                      <h1 className="text-[#898989] text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                        {formatLocation(citation.location)}
+                      </h1>
+                      <h1 className="text-[#898989] text-xs shrink-0">•</h1>
+                      <h1 className="text-[#898989] text-xs shrink-0">
+                        {citation.date}
+                      </h1>
+                    </div>
+                  </div>
+                </div>
+              </Popup>
+            )}
+          </React.Fragment>
         );
       })}
     </Map>
