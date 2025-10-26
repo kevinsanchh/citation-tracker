@@ -1,3 +1,5 @@
+// components/animated-tabs.tsx
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -22,8 +24,8 @@ const tabs = [
       <div className="p-4">
         <h3 className="text-xl font-bold">Parking Statistics</h3>
         <p className="mt-2 text-slate-300">
-          Here you could show charts and graphs about citation frequency, popular locations, or peak
-          times.
+          Here you could show charts and graphs about citation frequency,
+          popular locations, or peak times.
         </p>
       </div>
     ),
@@ -78,7 +80,9 @@ export default function AnimatedTabs() {
             key={tab.id}
             onClick={() => handleTabClick(tab.id)}
             className={`relative rounded-md  w-full py-1.5 text-xs font-medium transition focus-visible:outline-1 focus-visible:outline-gray-500 ${
-              activeTab === tab.id ? "text-white" : "text-slate-300 hover:text-white"
+              activeTab === tab.id
+                ? "text-white"
+                : "text-slate-300 hover:text-white"
             }`}
           >
             {/* The sliding pill indicator */}
