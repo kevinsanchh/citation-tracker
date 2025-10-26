@@ -117,7 +117,7 @@ export default function LatestCitation() {
         return (
           <div
             key={item.prefix}
-            className="flex flex-row active:bg-[#017AFF] active:text-white gap-3 rounded-md p-2 py-4 cursor-pointer"
+            className="flex flex-row active:bg-black/10 active:text-white gap-3 rounded-2xl p-2 py-4 cursor-pointer"
           >
             <div className="select-none aspect-square relative size-11 stroke-current rounded-full border-[3px] border-white ">
               <div className="select-none absolute w-full h-full bg-[#9297A3] text-white rounded-full p-2 flex justify-center items-center font-bold">

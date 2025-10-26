@@ -52,7 +52,6 @@ interface LatestCitationInfo {
   rawDate: string | null;
 }
 
-// ✨ NEW: Interface for daily totals
 interface DailyTotal {
   prefix: string;
   total_amount: number;
@@ -110,7 +109,6 @@ const fetcher = (key: string) =>
     return res.json();
   });
 
-// Helper function to check if citation is recent (within last 10 hours)
 function isRecentCitation(rawDate: string | null): boolean {
   if (!rawDate) return false;
   const citationTime = new Date(rawDate).getTime();
@@ -119,12 +117,10 @@ function isRecentCitation(rawDate: string | null): boolean {
   return now - citationTime < tenHoursInMs;
 }
 
-// Helper function to normalize location string for lookup
 function normalizeLocation(location: string): string {
   return location.toUpperCase().trim();
 }
 
-// ✨ NEW: Format location for display (matching your latest-citation component)
 function formatLocation(locationStr: string): string {
   const parts = locationStr.split(":");
   if (parts.length < 2) {
@@ -145,7 +141,7 @@ function formatLocation(locationStr: string): string {
 
 export default function MapComponent() {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  // ✨ NEW: State to track which officer's popup is open
+  // ✨ State to track which officer's popup is open
   const [selectedOfficer, setSelectedOfficer] = useState<string | null>(null);
 
   // Fetch latest citations
@@ -153,12 +149,12 @@ export default function MapComponent() {
     "/api/citations",
     fetcher,
     {
-      refreshInterval: 30000, // Refresh every 30 seconds
+      refreshInterval: 30000,
       revalidateOnFocus: false,
     }
   );
 
-  // ✨ NEW: Fetch daily totals
+  // ✨ Fetch daily totals
   const { data: dailyTotals } = useSWR<DailyTotal[]>(
     "/api/daily-totals",
     fetcher,
@@ -168,10 +164,14 @@ export default function MapComponent() {
     }
   );
 
+  // ✨ MERGED: Responsive zoom from main branch
+  const initialZoom =
+    typeof window !== "undefined" ? (window.innerWidth >= 768 ? 16 : 14) : 16;
+
   const initialViewState = {
     longitude: -80.375,
     latitude: 25.757,
-    zoom: 16,
+    zoom: initialZoom,
   };
 
   // Filter citations that are recent and have valid coordinates
@@ -181,7 +181,7 @@ export default function MapComponent() {
     return LOCATION_COORDINATES[normalizedLocation] !== undefined;
   });
 
-  // ✨ NEW: Create a map for quick lookup of daily totals
+  // ✨ Create a map for quick lookup of daily totals
   const totalsMap = new globalThis.Map<string, number>(
     dailyTotals?.map((item) => [item.prefix, item.total_amount]) ?? []
   );
@@ -194,7 +194,6 @@ export default function MapComponent() {
       mapStyle="mapbox://styles/mapbox/standard"
       minZoom={13}
       onLoad={() => setIsMapLoaded(true)}
-      // ✨ NEW: Close popup when clicking on the map
       onClick={() => setSelectedOfficer(null)}
     >
       {isMapLoaded && (
@@ -209,7 +208,6 @@ export default function MapComponent() {
         </Source>
       )}
 
-      {/* Render markers for active citations */}
       {activeCitations?.map((citation) => {
         const normalizedLocation = normalizeLocation(citation.location);
         const coordinates = LOCATION_COORDINATES[normalizedLocation];
@@ -226,7 +224,6 @@ export default function MapComponent() {
               latitude={latitude}
               longitude={longitude}
               anchor="bottom"
-              // ✨ NEW: Handle marker click
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 setSelectedOfficer(citation.prefix);
@@ -251,23 +248,18 @@ export default function MapComponent() {
               </div>
             </Marker>
 
-            {/* ✨ Popup positioned above the pin */}
-            {/* ✨ Popup positioned above the pin */}
             {selectedOfficer === citation.prefix && (
               <Popup
                 latitude={latitude}
                 longitude={longitude}
                 anchor="bottom"
                 onClose={() => setSelectedOfficer(null)}
-                closeButton={false} // ✨ NEW: Removes the X button
+                closeButton={false}
                 closeOnClick={false}
                 offset={50}
                 className="officer-popup"
               >
                 <div className="p-3 min-w-[200px]">
-                  {" "}
-                  {/* ✨ ADDED: rounded-xl for more rounded corners */}
-                  {/* Citation details */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <h1 className="font-bold text-black text-sm">
