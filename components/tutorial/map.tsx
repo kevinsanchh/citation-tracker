@@ -3,13 +3,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import Map from "react-map-gl/mapbox";
-import {
-  Source,
-  Layer,
-  Marker,
-  Popup,
-  type LayerSpecification,
-} from "react-map-gl/mapbox";
+import { Source, Layer, Marker, Popup, type LayerSpecification } from "react-map-gl/mapbox";
 import useSWR from "swr";
 
 // Location coordinates mapping
@@ -145,28 +139,19 @@ export default function MapComponent() {
   const [selectedOfficer, setSelectedOfficer] = useState<string | null>(null);
 
   // Fetch latest citations
-  const { data: latestCitations } = useSWR<LatestCitationInfo[]>(
-    "/api/citations",
-    fetcher,
-    {
-      refreshInterval: 30000,
-      revalidateOnFocus: false,
-    }
-  );
+  const { data: latestCitations } = useSWR<LatestCitationInfo[]>("/api/citations", fetcher, {
+    refreshInterval: 30000,
+    revalidateOnFocus: false,
+  });
 
   // ✨ Fetch daily totals
-  const { data: dailyTotals } = useSWR<DailyTotal[]>(
-    "/api/daily-totals",
-    fetcher,
-    {
-      refreshInterval: 30000,
-      revalidateOnFocus: false,
-    }
-  );
+  const { data: dailyTotals } = useSWR<DailyTotal[]>("/api/daily-totals", fetcher, {
+    refreshInterval: 30000,
+    revalidateOnFocus: false,
+  });
 
   // ✨ MERGED: Responsive zoom from main branch
-  const initialZoom =
-    typeof window !== "undefined" ? (window.innerWidth >= 768 ? 16 : 14) : 16;
+  const initialZoom = typeof window !== "undefined" ? (window.innerWidth >= 768 ? 16 : 14) : 16;
 
   const initialViewState = {
     longitude: -80.375,
@@ -257,26 +242,20 @@ export default function MapComponent() {
                 closeButton={false}
                 closeOnClick={false}
                 offset={50}
-                className="officer-popup"
+                className="officer-popup   "
               >
-                <div className="p-3 min-w-[200px]">
+                <div className="p-3 min-w-[200px]  ">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <h1 className="font-bold text-black text-sm">
-                        Officer {officerNumber}
-                      </h1>
-                      <h1 className="text-[#898989] text-xs">
-                        ${totalToday.toFixed(2)} tdy.
-                      </h1>
+                      <h1 className="font-bold text-black text-sm">Officer {officerNumber}</h1>
+                      <h1 className="text-[#898989] text-xs">${totalToday.toFixed(2)} tdy.</h1>
                     </div>
                     <div className="flex flex-row gap-2 overflow-hidden">
                       <h1 className="text-[#898989] text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                         {formatLocation(citation.location)}
                       </h1>
                       <h1 className="text-[#898989] text-xs shrink-0">•</h1>
-                      <h1 className="text-[#898989] text-xs shrink-0">
-                        {citation.date}
-                      </h1>
+                      <h1 className="text-[#898989] text-xs shrink-0">{citation.date}</h1>
                     </div>
                   </div>
                 </div>
