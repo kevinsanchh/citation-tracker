@@ -22,6 +22,7 @@ const prefixMap: { [key: string]: string } = {
   "11": "01",
   "73": "02",
   "04": "03",
+  "72": "04",
 };
 // ---
 // --- NEW HELPER FUNCTION for formatting the location string ---
@@ -77,9 +78,7 @@ export default function LatestCitation() {
     /* swr options */
   });
 
-  const totalsMap = new Map(
-    dailyTotals?.map((item) => [item.prefix, item.total_amount])
-  );
+  const totalsMap = new Map(dailyTotals?.map((item) => [item.prefix, item.total_amount]));
 
   // --- NEW: Create a sorted copy of the citations before rendering ---
   const sortedCitations = latestCitations
@@ -130,9 +129,7 @@ export default function LatestCitation() {
                   Officer {prefixMap[item.prefix] || item.prefix}
                 </h1>
                 {/* UPDATED: Display the total for today */}
-                <h1 className="text-[#898989] text-xs">
-                  ${totalToday.toFixed(2)} tdy.
-                </h1>
+                <h1 className="text-[#898989] text-xs">${totalToday.toFixed(2)} tdy.</h1>
               </div>
               <div className="flex flex-row gap-2 overflow-hidden">
                 <h1 className="text-[#898989] text-xs whitespace-nowrap overflow-hidden text-ellipsis">
