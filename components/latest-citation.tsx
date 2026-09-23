@@ -3,6 +3,8 @@
 "use client";
 
 import useSWR from "swr";
+import WatchedCitations from "./watched-citations";
+import { formatLocation } from "@/lib/utils";
 
 interface LatestCitationInfo {
   prefix: string;
@@ -22,29 +24,6 @@ const prefixMap: { [key: string]: string } = {
   "11": "01", // PAT2011xxxxx
 };
 // ---
-// --- NEW HELPER FUNCTION for formatting the location string ---
-function formatLocation(locationStr: string): string {
-  // Split the string at the first colon
-  const parts = locationStr.split(":");
-
-  // If there's no colon, return the original string
-  if (parts.length < 2) {
-    return locationStr;
-  }
-
-  const prefix = parts[0];
-  const description = parts[1].trim(); // Get the part after the colon and remove whitespace
-
-  // Convert the description to title case
-  const titleCasedDescription = description
-    .toLowerCase() // e.g., "gold garage"
-    .split(" ") // e.g., ["gold", "garage"]
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1)) // e.g., ["Gold", "Garage"]
-    .join(" "); // e.g., "Gold Garage"
-
-  // Recombine the prefix and the newly formatted description
-  return `${prefix}: ${titleCasedDescription}`;
-}
 // ---
 
 const fetcher = (key: string) =>
@@ -139,6 +118,7 @@ export default function LatestCitation() {
           </div>
         );
       })}
+      <WatchedCitations />
     </div>
   );
 }
