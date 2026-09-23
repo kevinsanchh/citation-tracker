@@ -3,7 +3,6 @@
 "use client";
 
 import useSWR from "swr";
-import WatchedCitations from "./watched-citations";
 import { formatLocation } from "@/lib/utils";
 
 interface LatestCitationInfo {
@@ -22,6 +21,7 @@ interface DailyTotal {
 // --- NEW: Define the prefix mapping object ---
 const prefixMap: { [key: string]: string } = {
   "11": "01", // PAT2011xxxxx
+  REV: "02", // REVMMDDYY-N and REVMMDDYYYY-N
 };
 // ---
 // ---
@@ -118,7 +118,6 @@ export default function LatestCitation() {
           </div>
         );
       })}
-      <WatchedCitations />
     </div>
   );
 }
