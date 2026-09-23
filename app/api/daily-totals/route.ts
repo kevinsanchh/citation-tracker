@@ -27,7 +27,6 @@ export async function GET() {
     const { data, error } = await supabase
       .from("citations")
       .select("citation_number, amount")
-      .like("citation_number", "PAT20%")
       .gte("citation_date", startOfTodayEastern());
 
     if (error) {

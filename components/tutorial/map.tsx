@@ -35,6 +35,7 @@ const LOCATION_COORDINATES: Record<string, [number, number]> = {
 
 const prefixMap: Record<string, string> = {
   "11": "01", // PAT2011xxxxx
+  REV: "02", // REVMMDDYY-N and REVMMDDYYYY-N
 };
 
 interface LatestCitationInfo {

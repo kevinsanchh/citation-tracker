@@ -29,7 +29,7 @@ This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (P
 
 - API routes (Next.js):
 
-  - `GET /api/citations` (`app/api/citations/route.ts`): queries Supabase for the most recently scraped citation (`scraped_at`) and its `location` for each citation series in `lib/citation-series.ts` (currently `PAT2011`). It returns a list with a human-friendly “x min/hr ago” string and the raw ISO timestamp for sorting.
+  - `GET /api/citations` (`app/api/citations/route.ts`): queries Supabase for the most recently scraped citation (`scraped_at`) and its `location` for each citation series in `lib/citation-series.ts` (currently `PAT2011` as Officer 01 and `REV` as Officer 02). It returns a list with a human-friendly “x min/hr ago” string and the raw ISO timestamp for sorting.
   - `GET /api/daily-totals` (`app/api/daily-totals/route.ts`): sums today’s `amount` (since midnight Miami time) per citation series.
 
 - Data source (Supabase):
@@ -37,7 +37,7 @@ This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (P
   - Table (expected): `citations(citation_number varchar primary key, citation_date timestamptz, violation text, location text, scraped_at timestamptz default now(), amount numeric)`. `violation` must allow nulls: the current portal doesn't show it.
 
 - Scraper (Python):
-  - `run_scraper.py` searches FIU’s T2 citation portal over plain HTTP (no browser). For each PAT series it counts up from the highest ID in the database, stops after 5 missing IDs in a row, then probes further ahead in case numbers were skipped. It upserts rows into the `citations` table using the Supabase Python client.
+  - `run_scraper.py` searches FIU’s T2 citation portal over plain HTTP (no browser). For each PAT series it counts up from the highest ID in the database, stops after 5 missing IDs in a row, then probes further ahead in case numbers were skipped. About once an hour (or with `--rev`) it also checks REV citations for the last 3 days: for each day it counts up from the highest known number, trying both `REVMMDDYY-N` and `REVMMDDYYYY-N`, until 5 in a row are missing. It upserts rows into the `citations` table using the Supabase Python client.
   - The portal only shows the issue date, not the time, so `citation_date` is stored as midnight Eastern. `scraped_at` (filled in by the database) records when the scraper found it, and the site uses it for "x min ago" and map pins.
   - If the portal's waiting room is active, the run stops and saves what it already found; the next run continues.
   - Intended to run on a schedule (e.g., GitHub Actions), but can also be run locally.
@@ -57,7 +57,7 @@ The scraper finds new citations by trying the next IDs in sequence, so it only w
 - `REV` + date + daily number (2026, all $15)
   - Typed by hand, so the format varies: `REVSEP1226-08`, `REVSEP142026-#51`, `REVSEP152026-#1`, `REV091526-2`, `REV091626-41`, `REV09232026-2`.
   - The date in the ID is when the ticket was written; the issue date can be up to 2 days later. The number after the dash restarts each day and covers all lots.
-  - Because the format keeps changing, these can't be found reliably by guessing the next ID.
+  - The scraper only checks the two numeric-date styles, `REVMMDDYY-N` and `REVMMDDYYYY-N` (the one used as of 09/23/2026). Other styles, like `REVSEP152026-#1`, are skipped.
 
 To check whether an ID exists, go to https://fiu.t2hosted.com/Account/Portal, enter it in the **Citation Number** field and click **Search Citations**. The search also works without a browser:
 
