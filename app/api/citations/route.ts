@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PostgrestError } from "@supabase/supabase-js";
+import { CITATION_SERIES, seriesPrefix } from "@/lib/citation-series";
 
 export const dynamic = "force-dynamic";
 // This function does the date formatting on the server
@@ -36,7 +37,7 @@ function formatRelativeTime(citationDateString: string): string {
 // ... (type definitions remain the same) ...
 // UPDATED: Type definitions to include citation_number
 // Update the type definitions to include the raw date
-type QueryResultData = { citation_date: string; location: string };
+type QueryResultData = { scraped_at: string; location: string };
 type QueryResult = {
   data: QueryResultData[] | null;
   error: PostgrestError | null;
@@ -54,13 +55,15 @@ export async function GET() {
       throw new Error(`Failed to connect to Supabase: ${connectionError.message}`);
     }
 
-    const prefixes = ["73", "11", "04", "72"];
+    const prefixes = CITATION_SERIES;
     const dateQueries = /* ... (query logic is the same) ... */ prefixes.map((prefix) =>
       supabase
         .from("citations")
-        .select("citation_date, location")
-        .like("citation_number", `${prefix}%`)
-        .order("citation_date", { ascending: false })
+        // The portal only gives the issue date, so use when the scraper found the citation.
+        .select("scraped_at, location")
+        .like("citation_number", `${seriesPrefix(prefix)}%`)
+        .order("scraped_at", { ascending: false })
+        .order("citation_number", { ascending: false })
         .limit(1)
     );
     const results = await Promise.all(dateQueries);
@@ -79,8 +82,8 @@ export async function GET() {
 
       if (result.data && result.data.length > 0) {
         const latest = result.data[0];
-        rawDate = latest.citation_date; // Keep the original ISO string
-        formattedDate = formatRelativeTime(latest.citation_date);
+        rawDate = latest.scraped_at; // Keep the original ISO string
+        formattedDate = formatRelativeTime(latest.scraped_at);
         location = latest.location;
       }
       return {

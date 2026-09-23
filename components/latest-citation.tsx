@@ -19,10 +19,7 @@ interface DailyTotal {
 
 // --- NEW: Define the prefix mapping object ---
 const prefixMap: { [key: string]: string } = {
-  "11": "01",
-  "73": "02",
-  "04": "03",
-  "72": "04",
+  "11": "01", // PAT2011xxxxx
 };
 // ---
 // --- NEW HELPER FUNCTION for formatting the location string ---

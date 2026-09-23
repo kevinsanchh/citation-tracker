@@ -19,7 +19,7 @@
 
 ## How this repository works
 
-This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (Postgres + Auth), Mapbox for the campus map, and a small Python Selenium scraper that writes new citations into the database.
+This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (Postgres + Auth), Mapbox for the campus map, and a small Python scraper that writes new citations into the database.
 
 - Frontend (Next.js):
 
@@ -29,17 +29,41 @@ This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (P
 
 - API routes (Next.js):
 
-  - `GET /api/citations` (`app/api/citations/route.ts`): queries Supabase for the most recent `citation_date` and `location` for the prefixes 73, 11, 04. It returns a list with a human-friendly “x min/hr ago” string and the raw ISO timestamp for sorting.
-  - `GET /api/daily-totals` (`app/api/daily-totals/route.ts`): calls the Postgres function `get_daily_totals` via `supabase.rpc(...)` to fetch today’s summed `amount` per prefix.
+  - `GET /api/citations` (`app/api/citations/route.ts`): queries Supabase for the most recently scraped citation (`scraped_at`) and its `location` for each citation series in `lib/citation-series.ts` (currently `PAT2011`). It returns a list with a human-friendly “x min/hr ago” string and the raw ISO timestamp for sorting.
+  - `GET /api/daily-totals` (`app/api/daily-totals/route.ts`): sums today’s `amount` (since midnight Miami time) per citation series.
 
 - Data source (Supabase):
 
-  - Table (expected): `citations(citation_number text primary key, citation_date timestamptz, violation text, location text, amount numeric)`.
-  - Database function (expected): `get_daily_totals()` that returns rows like `{ prefix text, total_amount numeric }` for “today”. This is used by the `/api/daily-totals` route.
+  - Table (expected): `citations(citation_number varchar primary key, citation_date timestamptz, violation text, location text, scraped_at timestamptz default now(), amount numeric)`. `violation` must allow nulls: the current portal doesn't show it.
 
 - Scraper (Python):
-  - `run_scraper.py` uses Selenium to probe FIU’s citation portal for new IDs, parses the citation row if present, normalizes `citation_date` into a timezone-aware ISO string, and upserts rows into the `citations` table using the Supabase Python client.
+  - `run_scraper.py` searches FIU’s T2 citation portal over plain HTTP (no browser). For each PAT series it counts up from the highest ID in the database, stops after 5 missing IDs in a row, then probes further ahead in case numbers were skipped. It upserts rows into the `citations` table using the Supabase Python client.
+  - The portal only shows the issue date, not the time, so `citation_date` is stored as midnight Eastern. `scraped_at` (filled in by the database) records when the scraper found it, and the site uses it for "x min ago" and map pins.
+  - If the portal's waiting room is active, the run stops and saves what it already found; the next run continues.
   - Intended to run on a schedule (e.g., GitHub Actions), but can also be run locally.
+
+### Citation number formats
+
+The scraper finds new citations by trying the next IDs in sequence, so it only works while citation numbers are predictable. FIU's portal has used three formats. These notes come from looking up citations by hand in September 2026; parts marked "likely" are inferred from a few examples.
+
+- Numeric, 10 digits (2025): `73` `25` `145042`
+  - The first 2 digits are the officer/device prefix (`73`, `11`, `04`, `72`).
+  - The next 2 digits are likely the year (`25`), followed by a counter that goes up by one per ticket (about 150/day on `73`).
+  - No numeric citations dated 2026 have been seen, so the scraper no longer checks them.
+- `PAT` + 9 digits (2026): `PAT` `20` `11` `15060`
+  - Counts up by one: `PAT201115059` and `PAT201115060` were both issued 09/11/2026, and `PAT201116000` on 09/23/2026 (about 78/day).
+  - Likely `20` is fixed, the next 2 digits are a device/officer (`11`, `07`), and the last 5 digits are the counter. `PAT200700190` (03/11/2026) would be a separate `07` series.
+  - This is the format the scraper and API routes use, grouping by the 2 digits after `PAT20`.
+- `REV` + date + daily number (2026, all $15)
+  - Typed by hand, so the format varies: `REVSEP1226-08`, `REVSEP142026-#51`, `REVSEP152026-#1`, `REV091526-2`, `REV091626-41`, `REV09232026-2`.
+  - The date in the ID is when the ticket was written; the issue date can be up to 2 days later. The number after the dash restarts each day and covers all lots.
+  - Because the format keeps changing, these can't be found reliably by guessing the next ID.
+
+To check whether an ID exists, go to https://fiu.t2hosted.com/Account/Portal, enter it in the **Citation Number** field and click **Search Citations**. The search also works without a browser:
+
+1. `GET /Account/Portal` to get the session cookie and the hidden `__RequestVerificationToken` from the `#citationSearch` form.
+2. `POST /Account/Citations/Search` with `__RequestVerificationToken`, `CitationNumber` and an empty `PlateNumber`, keeping the same cookies. The response redirects to the results page.
+3. `GET /Account/Citations/Results` returns a table with Citation #, Status, Balance, Issue Date, License Plate (masked) and Location.
 
 ### Environment variables
 
@@ -99,7 +123,7 @@ export SUPABASE_URL=...
 export SUPABASE_ANON_KEY=...
 ```
 
-3. Ensure you have a recent Google Chrome; Selenium will auto-manage the driver in recent versions. Then run:
+3. Run:
 
 ```bash
 python run_scraper.py
@@ -112,7 +136,7 @@ Newly found citations will be upserted into the `citations` table.
 - Supabase SSR is set up in `lib/supabase/server.ts` and `lib/supabase/client.ts`.
 - `middleware.ts` initializes the Supabase client so cookies/sessions stay in sync. A protected page example lives under `app/protected/` (redirects unauthenticated users).
 
-If you need help wiring the `citations` table and `get_daily_totals()` function, ask and we can add the SQL scaffold directly to this repo.
+If you need help wiring the `citations` table, ask and we can add the SQL scaffold directly to this repo.
 
 ## Features
 
