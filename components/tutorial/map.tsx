@@ -34,9 +34,7 @@ const LOCATION_COORDINATES: Record<string, [number, number]> = {
 };
 
 const prefixMap: Record<string, string> = {
-  "11": "01",
-  "73": "02",
-  "04": "03",
+  "11": "01", // PAT2011xxxxx
 };
 
 interface LatestCitationInfo {
@@ -107,7 +105,7 @@ function isRecentCitation(rawDate: string | null): boolean {
   if (!rawDate) return false;
   const citationTime = new Date(rawDate).getTime();
   const now = new Date().getTime();
-  const tenHoursInMs = 10 * 60 * 60 * 10000000;
+  const tenHoursInMs = 10 * 60 * 60 * 1000;
   return now - citationTime < tenHoursInMs;
 }
 
