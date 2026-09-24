@@ -38,9 +38,9 @@ This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (P
 
 - Scraper (Python):
   - `run_scraper.py` searches FIU’s T2 citation portal over plain HTTP (no browser). For each PAT series it counts up from the highest ID in the database, stops after 5 missing IDs in a row, then probes further ahead in case numbers were skipped. About once an hour (or with `--rev`) it also checks REV citations for the last 3 days: for each day it counts up from the highest known number, trying both `REVMMDDYY-N` and `REVMMDDYYYY-N`, until 5 in a row are missing. It upserts rows into the `citations` table using the Supabase Python client.
-  - The portal only shows the issue date, not the time, so `citation_date` is stored as midnight Eastern. `scraped_at` (filled in by the database) records when the scraper found it, and the site uses it for "x min ago" and map pins.
+  - The results page only shows the issue date. When logged in to the portal, the scraper also saves the violation and the time from the citation's photos; otherwise `citation_date` is stored as midnight Eastern. `scraped_at` (filled in by the database) records when the scraper found it, and the site uses it for "x min ago" and map pins.
   - If the portal's waiting room is active, the run stops and saves what it already found; the next run continues.
-  - Intended to run on a schedule (e.g., GitHub Actions), but can also be run locally.
+  - The scraper lives in a separate private repo, `cesardeltoral/parking_citation_scrapper`, which runs it every day at 1 PM Miami time with GitHub Actions.
 
 ### Citation number formats
 
@@ -106,30 +106,9 @@ npm run dev
 
 Open http://localhost:3000. The sidebar should show the latest citation per prefix and today’s totals if your database has data.
 
-### Run the scraper locally (optional)
+### Run the scraper
 
-1. Create and activate a virtual environment, then install Python deps
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-2. Export the Supabase environment variables (zsh)
-
-```bash
-export SUPABASE_URL=...
-export SUPABASE_ANON_KEY=...
-```
-
-3. Run:
-
-```bash
-python run_scraper.py
-```
-
-Newly found citations will be upserted into the `citations` table.
+The scraper isn't in this repo. See the README in `cesardeltoral/parking_citation_scrapper` for setup and how to run it locally.
 
 ### Notes on Auth & Middleware
 
