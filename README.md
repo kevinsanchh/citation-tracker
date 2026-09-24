@@ -24,7 +24,15 @@ This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (P
 - Frontend (Next.js):
 
   - `app/page.tsx` renders the main UI: a sidebar with tabs and a Mapbox map (`components/tutorial/map.tsx`).
-  - `components/latest-citation.tsx` uses SWR to call two API routes and shows the latest citation per officer prefix along with today’s total amount per prefix.
+  - `components/latest-citation.tsx` uses SWR to call two API routes and shows the latest citation per officer along with today’s total amount per officer.
+  - Officers are the series in `lib/citation-series.ts`, labeled by `prefixMap` in `components/latest-citation.tsx` and `components/tutorial/map.tsx`:
+
+    | Officer | Series | Example |
+    |---|---|---|
+    | 01 | `PAT2011` | `PAT201116072` |
+    | 02 | `REV` | `REV09232026-2` |
+
+  - The map shows a pin at each officer's latest location for 10 hours after the scraper found it. Locations need coordinates in `LOCATION_COORDINATES` (`components/tutorial/map.tsx`) to get a pin.
   - Tailwind and shadcn/ui handle styling.
 
 - API routes (Next.js):
@@ -40,6 +48,8 @@ This app is an FIU Citation Tracker built with Next.js (App Router), Supabase (P
   - `run_scraper.py` searches FIU’s T2 citation portal over plain HTTP (no browser). For each PAT series it counts up from the highest ID in the database, stops after 5 missing IDs in a row, then probes further ahead in case numbers were skipped. About once an hour (or with `--rev`) it also checks REV citations for the last 3 days: for each day it counts up from the highest known number, trying both `REVMMDDYY-N` and `REVMMDDYYYY-N`, until 5 in a row are missing. It upserts rows into the `citations` table using the Supabase Python client.
   - The portal only shows the issue date, not the time, so `citation_date` is stored as midnight Eastern. `scraped_at` (filled in by the database) records when the scraper found it, and the site uses it for "x min ago" and map pins.
   - If the portal's waiting room is active, the run stops and saves what it already found; the next run continues.
+  - Paid or closed citations don't appear on the portal, so they look the same as numbers that don't exist. The results page also sometimes bounces back to the portal right after a search; the scraper retries once with a fresh session before counting it as missing.
+  - The scraper is not in this repo yet. It lives in its own folder (`parking_citation_scrapper/`, with `run_scraper.py`, `requirements.txt`, `.env` and `.venv`). The GitHub Action in `.github/workflows/scraper.yml` expects `run_scraper.py` at the repo root, so it won't work until the file is added here.
   - Intended to run on a schedule (e.g., GitHub Actions), but can also be run locally.
 
 ### Citation number formats
@@ -54,6 +64,7 @@ The scraper finds new citations by trying the next IDs in sequence, so it only w
   - Counts up by one: `PAT201115059` and `PAT201115060` were both issued 09/11/2026, and `PAT201116000` on 09/23/2026 (about 78/day).
   - Likely `20` is fixed, the next 2 digits are a device/officer (`11`, `07`), and the last 5 digits are the counter. `PAT200700190` (03/11/2026) would be a separate `07` series.
   - This is the format the scraper and API routes use, grouping by the 2 digits after `PAT20`.
+  - A sweep of every series `00`–`99` on 09/23/2026 found only two others, both inactive: `07` (`PAT200700190`–`PAT200700260`, Mar 11 – Apr 23, 2026) and `13` (`PAT201300050`, `PAT201300075`, Feb 4–5, 2026). `11` is the only active series (about 78 citations a day).
 - `REV` + date + daily number (2026, all $15)
   - Typed by hand, so the format varies: `REVSEP1226-08`, `REVSEP142026-#51`, `REVSEP152026-#1`, `REV091526-2`, `REV091626-41`, `REV09232026-2`.
   - The date in the ID is when the ticket was written; the issue date can be up to 2 days later. The number after the dash restarts each day and covers all lots.
@@ -64,6 +75,14 @@ To check whether an ID exists, go to https://fiu.t2hosted.com/Account/Portal, en
 1. `GET /Account/Portal` to get the session cookie and the hidden `__RequestVerificationToken` from the `#citationSearch` form.
 2. `POST /Account/Citations/Search` with `__RequestVerificationToken`, `CitationNumber` and an empty `PlateNumber`, keeping the same cookies. The response redirects to the results page.
 3. `GET /Account/Citations/Results` returns a table with Citation #, Status, Balance, Issue Date, License Plate (masked) and Location.
+
+### Adding a new series
+
+If a new officer/series shows up (e.g. a plate lookup shows a `PAT20xx` with a new `xx`):
+
+1. Scraper: add it to `citation_series` in `run_scraper.py` with the counter to start after, e.g. `"13": 75`.
+2. Site: add it to `CITATION_SERIES` in `lib/citation-series.ts`.
+3. Site: give it an officer number in `prefixMap` in both `components/latest-citation.tsx` and `components/tutorial/map.tsx`, e.g. `"13": "03"`.
 
 ### Environment variables
 
@@ -106,30 +125,33 @@ npm run dev
 
 Open http://localhost:3000. The sidebar should show the latest citation per prefix and today’s totals if your database has data.
 
-### Run the scraper locally (optional)
+### Run the scraper locally
 
-1. Create and activate a virtual environment, then install Python deps
+From the scraper's folder, using the Python in its `.venv` (it already has `httpx`, `supabase` and `python-dotenv` installed):
+
+```bash
+cd ~/Documents/parking_citation_scrapper
+.venv/bin/python run_scraper.py          # PAT citations (plus REV during the first 10 minutes of each hour)
+.venv/bin/python run_scraper.py --rev    # always include the REV check
+```
+
+It reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the `.env` file in that folder, so run it from inside the folder. To set it up from scratch:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/pip install -r requirements.txt   # httpx, supabase, python-dotenv
 ```
 
-2. Export the Supabase environment variables (zsh)
+A run takes about 1–2 minutes. Output to expect:
 
-```bash
-export SUPABASE_URL=...
-export SUPABASE_ANON_KEY=...
-```
+- `Starting after last known ID: PAT2011…`: where the PAT check starts (the highest saved ID).
+- `--- Checking REV citations after REV…-N ---`: one line per day and date format checked (N is the highest saved count for that day, 0 if none).
+- `Found a total of N unique new citations… Successfully inserted new citations.` or `No new citations found across all series.`
+- `Stopping early, portal unavailable`: the portal's waiting room is active. What was found so far is saved; try again later.
 
-3. Run:
+### Dependencies
 
-```bash
-python run_scraper.py
-```
-
-Newly found citations will be upserted into the `citations` table.
+- Next.js is pinned to `15.5.26`. Versions before 15.5.7 are affected by CVE-2025-66478, and Vercel refuses to deploy them. Keep it pinned (not `latest`) so installs don't jump to Next 16, which has breaking changes.
 
 ### Notes on Auth & Middleware
 
