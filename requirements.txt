@@ -1,4 +1,0 @@
-Flask
-selenium
-pytz
-supabase
