@@ -102,14 +102,6 @@ const fetcher = (key: string) =>
     return res.json();
   });
 
-function isRecentCitation(rawDate: string | null): boolean {
-  if (!rawDate) return false;
-  const citationTime = new Date(rawDate).getTime();
-  const now = new Date().getTime();
-  const tenHoursInMs = 10 * 60 * 60 * 1000;
-  return now - citationTime < tenHoursInMs;
-}
-
 function normalizeLocation(location: string): string {
   return location.toUpperCase().trim();
 }
@@ -158,9 +150,8 @@ export default function MapComponent() {
     zoom: initialZoom,
   };
 
-  // Filter citations that are recent and have valid coordinates
+  // Always show each officer at their last known location, however old it is
   const activeCitations = latestCitations?.filter((citation) => {
-    if (!isRecentCitation(citation.rawDate)) return false;
     const normalizedLocation = normalizeLocation(citation.location);
     return LOCATION_COORDINATES[normalizedLocation] !== undefined;
   });
